@@ -157,7 +157,6 @@ SELECT pg_catalog.setval('public.categories_id_seq', 6, true);
 -- Name: questions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: student
 --
 
-SELECT pg_catalog.setval('public.questions_id_seq', 23, true);
 
 
 --
