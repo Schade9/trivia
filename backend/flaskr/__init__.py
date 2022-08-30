@@ -26,7 +26,7 @@ def create_app(test_config=None):
     """
     @TODO: Set up CORS. Allow '*' for origins. Delete the sample route after completing the TODOs
     """
-    CORS(app)
+    cors = CORS(app, resources={r"/*": {"origins": "*"}})
 
     """
     @TODO: Use the after_request decorator to set Access-Control-Allow
@@ -124,6 +124,32 @@ def create_app(test_config=None):
     the form will clear and the question will appear at the end of the last page
     of the questions list in the "List" tab.
     """
+    @app.route('/questions', methods=['POST'])
+    def create_question():
+        body = request.get_json()
+
+        new_question = body.get('question', None)
+        new_answer = body.get('answer', None)
+        new_category = body.get('category', None)
+        new_difficulty = body.get('difficulty', None)
+
+        question = Question(
+            question = new_question,
+            answer = new_answer,
+            category = new_category,
+            difficulty = new_difficulty
+        )
+        question.insert()
+
+        selection = Question.query.order_by(Question.id).all()
+        current_questions = paginate_questions(request, selection)
+
+        return jsonify({
+            'success': True,
+            'created': question.id,
+            'questions': current_questions,
+            'total_questions': len(selection.all())
+        })
 
     """
     @TODO:
@@ -135,6 +161,20 @@ def create_app(test_config=None):
     only question that include that string within their question.
     Try using the word "title" to start.
     """
+    @app.route('/questions', methods=['POST'])
+    def search_question():
+        body = request.get_json()
+
+        search = body.get('search', None)
+
+        selection = Question.query.order_by(Question.id).filter(Question.question.ilike('%{}%'.format(search)))
+        current_questions = paginate_questions(request, selection)
+
+        return jsonify({
+            'success': True,
+            'questions': current_questions,
+            'total_questions': len(selection.all())
+        })
 
     """
     @TODO:
@@ -144,6 +184,17 @@ def create_app(test_config=None):
     categories in the left column will cause only questions of that
     category to be shown.
     """
+    @app.route('/categories/<int:category_id>/questions')
+    def retrieve_category_questions(category_id):
+        category = Category.query.filter(Category.id == category_id).one_or_none()
+        selection = Question.query.filter(Question.category == category.type)
+        current_questions = paginate_questions(request, selection)
+
+        return jsonify({
+            'success': True,
+            'questions': current_questions,
+            'total_questions': len(selection.all()),
+        })
 
     """
     @TODO:
@@ -156,12 +207,68 @@ def create_app(test_config=None):
     one question at a time is displayed, the user is allowed to answer
     and shown whether they were correct or not.
     """
+    @app.route('/play', methods=['POST', 'GET'])
+    def play():
+        body = request.get_json()
+
+        try:
+            # get category type
+            play_category = body.get('category', None)['id']
+
+            # get previous question
+            previous_questions = body.get('previous_questions', None)
+
+            questions = []
+
+            # get category type questions
+            if play_category == 0:
+                questions = Question.query.filter(Question.id.notin_(previous_questions)).all()
+            else:
+                category = Category.query.get(play_category)
+                questions = Question.query.filter(Question.id.notin_(previous_questions), Question.category == category)
+            
+            current_question = None
+
+            if (len(questions)>0):
+                index = random.randrange(0, len(questions))
+                current_question = questions[index].format()
+
+            return jsonify({
+                'success': True,
+                'question': current_question,
+                'total_questions': len(questions)
+            })
+        except:
+            abort(422)
 
     """
     @TODO:
     Create error handlers for all expected errors
     including 404 and 422.
-    """
+    """ 
+    @app.errorhandler(404)
+    def not_found(error):
+        return ({
+            "success": False,
+            "error": 404,
+            "message": "resource not found"
+        }), 404
+
+    @app.errorhandler(422)
+    def unprocessable(error):
+        return ({
+            "success": False,
+            "error": 422,
+            "message": "unprocessable"
+        }), 422
+
+    @app.errorhandler(422)
+    def bad_request(error):
+        return ({
+            "success": False,
+            "error": 400,
+            "message": "Bad request",
+        })
 
     return app
 
